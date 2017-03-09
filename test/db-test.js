@@ -2,7 +2,7 @@ const test = require('ava')
 const uuid = require('uuid-base62')
 const r = require('rethinkdb')
 const Db = require('../')
-const fixtures = require('./fixtures')
+const fixtures = require('./fixtures/')
 
 const dbName = `Shabbat_${uuid.v4()}`
 const db = new Db({db: dbName})
@@ -15,24 +15,41 @@ test.before('connect db', async t => {
 })
 
 test.after('Drop a database', async t => {
-  let conn = await r.connect({})
-  await r.dbDrop(dbName).run(conn)
-})
-
-test.after.always('Disconnect from database', async t => {
   await db.disconnect()
   t.false(db.connected)
 })
 
+test.after.always('Disconnect from database', async t => {
+  let conn = await db.connect({})
+  await r.dbDrop(dbName).run(conn)
+})
+
 // --------------------- Test´s -------------------- //
 
-test('Should by a second test', async t => {
+// SaveCustomer Method Test
+test('saveCustomer test', async t => {
   let customer = fixtures.getCustomer()
   t.is(typeof db.saveCustomer, 'function', 'should by a function')
-  let result = await db.saveCustomer(customer)
 
-  t.is(result.name, customer.name)
-  t.is(result.email, customer.email)
-  t.is(result.phone, customer.phone)
-  t.deepEqual(result.payment_sources, customer.payment_sources)
+  let created = await db.saveCustomer(customer)
+  t.is(created.name, customer.name)
+  t.is(created.email, customer.email)
+  t.is(created.phone, customer.phone)
+  t.is(typeof created.id, 'string')
+  t.truthy(created.public_id)
+  t.is(created.public_id, uuid.encode(created.id))
+  t.truthy(created.createdAt)
+  t.deepEqual(created.payment_sources, customer.payment_sources)
+})
+
+// getCustomer Method Test
+test('getCustomer test', async t => {
+  let customer = fixtures.getCustomer()
+  t.is(typeof db.getCustomer, 'function', 'Should by a function')
+
+  let created = await db.saveCustomer(customer)
+  let result = await db.getCustomer(created.public_id)
+
+  t.truthy(created.public_id)
+  t.deepEqual(result, created)
 })
